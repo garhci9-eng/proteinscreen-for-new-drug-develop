@@ -1,0 +1,32 @@
+{
+  "name": "proteinscreen-ai-backend",
+  "version": "1.0.0",
+  "description": "Drug discovery protein screening AI agent backend",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "nodemon backend/server.js",
+    "test": "echo \"Tests coming soon\" && exit 0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  },
+  "keywords": [
+    "drug-discovery",
+    "protein-screening",
+    "bioinformatics",
+    "ai-agent",
+    "cheminformatics",
+    "open-science"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

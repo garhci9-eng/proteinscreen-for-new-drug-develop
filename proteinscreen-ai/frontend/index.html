@@ -1,0 +1,1366 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProteinScreen AI — Drug Discovery Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════
+   DESIGN TOKENS
+═══════════════════════════════════════════ */
+:root {
+  --bg-base:    #07090f;
+  --bg-surface: #0d1117;
+  --bg-raised:  #131a24;
+  --bg-hover:   #1a2332;
+
+  --green:      #00e5a0;
+  --green-dim:  rgba(0,229,160,0.08);
+  --green-mid:  rgba(0,229,160,0.18);
+  --green-glow: 0 0 20px rgba(0,229,160,0.12);
+
+  --blue:       #4da6ff;
+  --blue-dim:   rgba(77,166,255,0.08);
+
+  --amber:      #ffb740;
+  --amber-dim:  rgba(255,183,64,0.08);
+
+  --red:        #ff6b6b;
+  --red-dim:    rgba(255,107,107,0.08);
+
+  --text-1: #e4eaf2;
+  --text-2: #7a8fa8;
+  --text-3: #3a4f66;
+
+  --border:     rgba(255,255,255,0.06);
+  --border-2:   rgba(0,229,160,0.2);
+  --border-3:   rgba(0,229,160,0.4);
+
+  --mono:  'Space Mono', monospace;
+  --sans:  'DM Sans', sans-serif;
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+
+/* ═══════════════════════════════════════════
+   RESET & BASE
+═══════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  background: var(--bg-base);
+  color: var(--text-1);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ═══════════════════════════════════════════
+   SCROLLBAR
+═══════════════════════════════════════════ */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
+
+/* ═══════════════════════════════════════════
+   TOPBAR
+═══════════════════════════════════════════ */
+.topbar {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+  flex-shrink: 0;
+  gap: 16px;
+  z-index: 10;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-hex {
+  width: 32px;
+  height: 32px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo-hex svg { position: absolute; }
+
+.logo-text {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text-1);
+  letter-spacing: -0.3px;
+}
+
+.logo-text span {
+  color: var(--green);
+}
+
+.topbar-nav {
+  display: flex;
+  gap: 2px;
+  margin-left: 24px;
+}
+
+.nav-tab {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 5px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--text-2);
+  border: 1px solid transparent;
+  transition: all 0.15s;
+  letter-spacing: 0.5px;
+}
+
+.nav-tab:hover { color: var(--text-1); background: var(--bg-hover); }
+.nav-tab.active {
+  color: var(--green);
+  background: var(--green-dim);
+  border-color: var(--border-2);
+}
+
+.topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--green);
+  background: var(--green-dim);
+  border: 1px solid var(--border-2);
+  padding: 4px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.5px;
+}
+
+.pulse-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.4; transform: scale(0.8); }
+}
+
+.api-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-3);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 5px;
+}
+
+/* ═══════════════════════════════════════════
+   MAIN LAYOUT
+═══════════════════════════════════════════ */
+.main {
+  display: grid;
+  grid-template-columns: 240px 1fr 268px;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ═══════════════════════════════════════════
+   PANELS BASE
+═══════════════════════════════════════════ */
+.panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-surface);
+}
+
+.panel-left  { border-right: 1px solid var(--border); }
+.panel-right { border-left:  1px solid var(--border); }
+
+.section-title {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-3);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 14px 16px 8px;
+}
+
+/* ═══════════════════════════════════════════
+   LEFT PANEL — TARGETS
+═══════════════════════════════════════════ */
+.panel-left {
+  overflow-y: auto;
+}
+
+.target-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 8px;
+  padding: 9px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+}
+
+.target-item:hover {
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
+
+.target-item.active {
+  background: var(--green-dim);
+  border-color: var(--border-2);
+}
+
+.target-icon {
+  width: 34px; height: 34px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.ti-g { background: rgba(0,229,160,0.12); }
+.ti-a { background: rgba(255,183,64,0.12); }
+.ti-b { background: rgba(77,166,255,0.12); }
+.ti-r { background: rgba(255,107,107,0.12); }
+
+.target-meta { flex: 1; min-width: 0; }
+.target-name { font-size: 13px; font-weight: 600; color: var(--text-1); }
+.target-type { font-size: 10px; font-family: var(--mono); color: var(--text-2); margin-top: 1px; }
+
+.score-badge {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--green);
+  background: var(--green-dim);
+  padding: 2px 7px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+/* STATS GRID */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 8px 12px 16px;
+}
+
+.stat-box {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+
+.stat-val {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.stat-lbl {
+  font-size: 10px;
+  color: var(--text-2);
+  margin-top: 2px;
+  font-family: var(--mono);
+}
+
+.sv-g { color: var(--green); }
+.sv-a { color: var(--amber); }
+.sv-b { color: var(--blue);  }
+.sv-r { color: var(--red);   }
+
+/* PIPELINE */
+.pipeline { padding: 6px 8px 16px; display: flex; flex-direction: column; gap: 3px; }
+
+.pipe-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.pipe-step.done    { background: var(--green-dim); border-color: var(--border-2); }
+.pipe-step.running { background: var(--amber-dim); border-color: rgba(255,183,64,0.25); }
+.pipe-step.pending { opacity: 0.35; }
+
+.pipe-icon-wrap {
+  width: 26px; height: 26px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.pipe-step.done    .pipe-icon-wrap { background: rgba(0,229,160,0.18); }
+.pipe-step.running .pipe-icon-wrap { background: rgba(255,183,64,0.18); }
+.pipe-step.pending .pipe-icon-wrap { background: var(--bg-raised); }
+
+.pipe-info { flex: 1; }
+.pipe-name { font-size: 12px; font-weight: 500; }
+.pipe-sub  { font-size: 10px; font-family: var(--mono); color: var(--text-2); margin-top: 1px; }
+
+.pipe-status {
+  font-family: var(--mono);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.ps-done    { color: var(--green); }
+.ps-running { color: var(--amber); animation: pulse 1.5s infinite; }
+.ps-pending { color: var(--text-3); }
+
+/* ═══════════════════════════════════════════
+   CENTER PANEL — CHAT
+═══════════════════════════════════════════ */
+.panel-center {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-base);
+}
+
+.chat-topbar {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  background: var(--bg-surface);
+}
+
+.chat-title { font-size: 13px; font-weight: 600; color: var(--text-1); }
+
+.mode-chip {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 3px 9px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  transition: all 0.15s;
+  letter-spacing: 0.3px;
+}
+
+.mode-chip:hover { border-color: var(--border-2); color: var(--green); }
+.mode-chip.active { background: var(--green-dim); border-color: var(--border-3); color: var(--green); }
+
+.target-indicator {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-2);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  padding: 3px 10px;
+  border-radius: 4px;
+}
+
+.target-indicator span { color: var(--green); }
+
+/* MESSAGES */
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.msg { display: flex; flex-direction: column; gap: 5px; animation: msgIn 0.25s ease; }
+.msg-user  { align-items: flex-end; }
+.msg-agent { align-items: flex-start; }
+
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.agent-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--green);
+  letter-spacing: 0.3px;
+}
+
+.agent-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+.bubble {
+  max-width: 85%;
+  padding: 11px 15px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.msg-user .bubble {
+  background: var(--bg-raised);
+  border: 1px solid var(--border-2);
+  border-bottom-right-radius: 3px;
+  color: var(--text-1);
+}
+
+.msg-agent .bubble {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 3px;
+  color: var(--text-1);
+}
+
+/* Typing animation */
+.typing-bubble {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 11px 15px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  border-bottom-left-radius: 3px;
+}
+
+.typing-bubble span {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: bounce 1.2s infinite;
+}
+.typing-bubble span:nth-child(2) { animation-delay: 0.15s; }
+.typing-bubble span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes bounce {
+  0%, 60%, 100% { transform: none; opacity: 0.3; }
+  30%            { transform: translateY(-4px); opacity: 1; }
+}
+
+/* Hit result table inside bubble */
+.hit-table {
+  margin-top: 10px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-2);
+  border-radius: 8px;
+  overflow: hidden;
+  font-family: var(--mono);
+}
+
+.hit-table-head {
+  display: grid;
+  grid-template-columns: 80px 1fr 90px 50px;
+  padding: 6px 12px;
+  background: var(--green-dim);
+  border-bottom: 1px solid var(--border-2);
+  font-size: 9px;
+  color: var(--green);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.hit-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 90px 50px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  align-items: center;
+  transition: background 0.1s;
+}
+.hit-row:last-child { border-bottom: none; }
+.hit-row:hover { background: var(--bg-hover); }
+
+.hit-id   { color: var(--green); }
+.hit-name { color: var(--text-1); font-size: 10px; }
+.hit-score { color: var(--amber); }
+
+.affinity-wrap { display: flex; align-items: center; gap: 5px; }
+.affinity-bar  { height: 3px; border-radius: 2px; background: var(--green); }
+
+/* INPUT AREA */
+.input-area {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-surface);
+  flex-shrink: 0;
+}
+
+.quick-actions {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.qa {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-2);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.13s;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.qa:hover {
+  color: var(--green);
+  border-color: var(--border-2);
+  background: var(--green-dim);
+}
+
+.input-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.chat-input {
+  flex: 1;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  color: var(--text-1);
+  font-family: var(--sans);
+  font-size: 13px;
+  outline: none;
+  resize: none;
+  transition: border-color 0.15s;
+  min-height: 40px;
+  max-height: 120px;
+  line-height: 1.5;
+}
+
+.chat-input:focus { border-color: var(--border-2); }
+.chat-input::placeholder { color: var(--text-3); }
+
+.send-btn {
+  width: 40px; height: 40px;
+  background: var(--green);
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.send-btn:hover  { opacity: 0.85; }
+.send-btn:active { transform: scale(0.94); }
+
+/* ═══════════════════════════════════════════
+   RIGHT PANEL
+═══════════════════════════════════════════ */
+.panel-right {
+  overflow-y: auto;
+  background: var(--bg-surface);
+}
+
+/* 2D Mol canvas */
+.mol-viewer {
+  margin: 8px 12px 4px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  height: 148px;
+  position: relative;
+  overflow: hidden;
+}
+
+.mol-viewer canvas { display: block; }
+
+.mol-overlay {
+  position: absolute;
+  bottom: 8px; left: 10px;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-2);
+  letter-spacing: 0.5px;
+}
+
+/* Property bars */
+.prop-bars { padding: 6px 12px 14px; display: flex; flex-direction: column; gap: 7px; }
+
+.prop-row { display: flex; align-items: center; gap: 8px; }
+
+.prop-lbl {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-2);
+  width: 78px;
+  flex-shrink: 0;
+  letter-spacing: 0.3px;
+}
+
+.prop-track {
+  flex: 1;
+  height: 4px;
+  background: var(--bg-raised);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.prop-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 1.2s cubic-bezier(0.16,1,0.3,1);
+}
+
+.pf-g { background: var(--green); }
+.pf-b { background: var(--blue); }
+.pf-a { background: var(--amber); }
+
+.prop-val {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-2);
+  width: 30px;
+  text-align: right;
+}
+
+/* Residue tags */
+.residue-tags {
+  padding: 6px 12px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.res-tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  color: var(--text-2);
+}
+
+.res-tag.hot {
+  color: var(--green);
+  border-color: var(--border-2);
+  background: var(--green-dim);
+}
+
+/* Divider */
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+/* ═══════════════════════════════════════════
+   LOADING SCREEN
+═══════════════════════════════════════════ */
+#loader {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-base);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  z-index: 999;
+  transition: opacity 0.4s;
+}
+
+.loader-hex {
+  animation: spin 3s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.loader-text {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--green);
+  letter-spacing: 2px;
+}
+
+.loader-sub {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-3);
+  letter-spacing: 1px;
+}
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <svg class="loader-hex" width="60" height="60" viewBox="0 0 60 60">
+    <polygon points="30,4 54,17 54,43 30,56 6,43 6,17"
+      fill="none" stroke="#00e5a0" stroke-width="1.5" opacity="0.4"/>
+    <polygon points="30,12 46,21 46,39 30,48 14,39 14,21"
+      fill="none" stroke="#00e5a0" stroke-width="1"/>
+    <circle cx="30" cy="30" r="5" fill="#00e5a0"/>
+  </svg>
+  <div class="loader-text">PROTEINSCREEN AI</div>
+  <div class="loader-sub">INITIALIZING SCREENING ENGINE...</div>
+</div>
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <div class="logo">
+    <svg width="32" height="32" viewBox="0 0 32 32">
+      <polygon points="16,3 28,9.5 28,22.5 16,29 4,22.5 4,9.5"
+        fill="none" stroke="#00e5a0" stroke-width="1.2"/>
+      <text x="16" y="20" text-anchor="middle" font-family="Space Mono"
+        font-size="9" fill="#00e5a0" font-weight="700">PS</text>
+    </svg>
+    <div class="logo-text">Protein<span>Screen</span> AI</div>
+  </div>
+
+  <nav class="topbar-nav">
+    <div class="nav-tab active">Screening</div>
+    <div class="nav-tab">Docking</div>
+    <div class="nav-tab">ADMET</div>
+    <div class="nav-tab">SAR</div>
+    <div class="nav-tab">Reports</div>
+  </nav>
+
+  <div class="topbar-right">
+    <div class="api-badge">claude-sonnet-4</div>
+    <div class="status-pill">
+      <div class="pulse-dot"></div>
+      AGENT ONLINE
+    </div>
+  </div>
+</header>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- ── LEFT PANEL ── -->
+  <aside class="panel panel-left">
+    <div class="section-title">Target Proteins</div>
+
+    <div id="targetList">
+      <div class="target-item active" data-target="EGFR" onclick="selectTarget(this)">
+        <div class="target-icon ti-g">🧬</div>
+        <div class="target-meta">
+          <div class="target-name">EGFR</div>
+          <div class="target-type">Tyrosine Kinase</div>
+        </div>
+        <div class="score-badge">8.7</div>
+      </div>
+      <div class="target-item" data-target="KRAS G12C" onclick="selectTarget(this)">
+        <div class="target-icon ti-a">⚡</div>
+        <div class="target-meta">
+          <div class="target-name">KRAS G12C</div>
+          <div class="target-type">GTPase · Oncogene</div>
+        </div>
+        <div class="score-badge">7.2</div>
+      </div>
+      <div class="target-item" data-target="ACE2" onclick="selectTarget(this)">
+        <div class="target-icon ti-b">🔬</div>
+        <div class="target-meta">
+          <div class="target-name">ACE2</div>
+          <div class="target-type">Metalloprotease</div>
+        </div>
+        <div class="score-badge">6.9</div>
+      </div>
+      <div class="target-item" data-target="CDK4/6" onclick="selectTarget(this)">
+        <div class="target-icon ti-r">🔴</div>
+        <div class="target-meta">
+          <div class="target-name">CDK4/6</div>
+          <div class="target-type">Cell Cycle Kinase</div>
+        </div>
+        <div class="score-badge">9.1</div>
+      </div>
+      <div class="target-item" data-target="BCL-2" onclick="selectTarget(this)">
+        <div class="target-icon ti-g">🟢</div>
+        <div class="target-meta">
+          <div class="target-name">BCL-2</div>
+          <div class="target-type">Anti-apoptotic</div>
+        </div>
+        <div class="score-badge">8.3</div>
+      </div>
+    </div>
+
+    <div class="divider" style="margin: 10px 0 4px;"></div>
+    <div class="section-title">Session Stats</div>
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-val sv-g" id="statScreened">847</div>
+        <div class="stat-lbl">Screened</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val sv-a">23</div>
+        <div class="stat-lbl">Hits</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val sv-b">5</div>
+        <div class="stat-lbl">Leads</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val sv-r">2.7%</div>
+        <div class="stat-lbl">Hit Rate</div>
+      </div>
+    </div>
+
+    <div class="divider" style="margin: 4px 0;"></div>
+    <div class="section-title">Pipeline Status</div>
+    <div class="pipeline">
+      <div class="pipe-step done">
+        <div class="pipe-icon-wrap">📥</div>
+        <div class="pipe-info">
+          <div class="pipe-name">Library Import</div>
+          <div class="pipe-sub">ChEMBL · 50K cpds</div>
+        </div>
+        <div class="pipe-status ps-done">✓ DONE</div>
+      </div>
+      <div class="pipe-step done">
+        <div class="pipe-icon-wrap">⚗️</div>
+        <div class="pipe-info">
+          <div class="pipe-name">QSAR Filter</div>
+          <div class="pipe-sub">847 passed</div>
+        </div>
+        <div class="pipe-status ps-done">✓ DONE</div>
+      </div>
+      <div class="pipe-step running">
+        <div class="pipe-icon-wrap">🧲</div>
+        <div class="pipe-info">
+          <div class="pipe-name">Docking</div>
+          <div class="pipe-sub">In progress · 68%</div>
+        </div>
+        <div class="pipe-status ps-running">▶ RUN</div>
+      </div>
+      <div class="pipe-step pending">
+        <div class="pipe-icon-wrap">💊</div>
+        <div class="pipe-info">
+          <div class="pipe-name">ADMET Eval</div>
+          <div class="pipe-sub">Pending</div>
+        </div>
+        <div class="pipe-status ps-pending">— WAIT</div>
+      </div>
+      <div class="pipe-step pending">
+        <div class="pipe-icon-wrap">🏆</div>
+        <div class="pipe-info">
+          <div class="pipe-name">Lead Ranking</div>
+          <div class="pipe-sub">Pending</div>
+        </div>
+        <div class="pipe-status ps-pending">— WAIT</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── CENTER PANEL ── -->
+  <main class="panel-center">
+    <div class="chat-topbar">
+      <div class="chat-title">Agent Console</div>
+      <div class="mode-chip active">SCREENING</div>
+      <div class="mode-chip">DOCKING</div>
+      <div class="mode-chip">ADMET</div>
+      <div class="mode-chip">SAR</div>
+      <div class="target-indicator">TARGET: <span id="currentTargetLabel">EGFR</span></div>
+    </div>
+
+    <div class="messages" id="messages">
+
+      <!-- Welcome message -->
+      <div class="msg msg-agent">
+        <div class="agent-label"><div class="agent-dot"></div>ProteinScreen Agent</div>
+        <div class="bubble">
+          안녕하세요! 신약 개발 단백질 스크리닝 AI 에이전트입니다.<br><br>
+          저는 다음 분석을 수행할 수 있습니다:<br>
+          • <strong style="color:var(--green)">가상 스크리닝</strong> — 화합물 라이브러리 고처리량 스크리닝<br>
+          • <strong style="color:var(--blue)">분자 도킹</strong> — 결합 친화도 및 포즈 예측<br>
+          • <strong style="color:var(--amber)">ADMET 분석</strong> — 약동력학적 특성 평가<br>
+          • <strong style="color:var(--text-1)">SAR 분석</strong> — 구조-활성 관계 및 리드 최적화<br><br>
+          왼쪽 패널에서 타겟 단백질을 선택하고 질문을 입력하세요.
+        </div>
+      </div>
+
+      <!-- Example result -->
+      <div class="msg msg-agent">
+        <div class="agent-label"><div class="agent-dot"></div>Screening Results · EGFR</div>
+        <div class="bubble">
+          EGFR 타겟에 대한 초기 가상 스크리닝 완료. 847개 화합물 중 상위 5개 히트 식별:
+          <div class="hit-table">
+            <div class="hit-table-head">
+              <span>ID</span>
+              <span>Name</span>
+              <span>Affinity</span>
+              <span>Score</span>
+            </div>
+            <div class="hit-row">
+              <span class="hit-id">CPD-2847</span>
+              <span class="hit-name">Erlotinib analog</span>
+              <div class="affinity-wrap"><div class="affinity-bar" style="width:74px"></div></div>
+              <span class="hit-score">−9.2</span>
+            </div>
+            <div class="hit-row">
+              <span class="hit-id">CPD-1192</span>
+              <span class="hit-name">Quinazoline deriv.</span>
+              <div class="affinity-wrap"><div class="affinity-bar" style="width:68px"></div></div>
+              <span class="hit-score">−8.7</span>
+            </div>
+            <div class="hit-row">
+              <span class="hit-id">CPD-3301</span>
+              <span class="hit-name">Pyrimidine scaffold</span>
+              <div class="affinity-wrap"><div class="affinity-bar" style="width:63px"></div></div>
+              <span class="hit-score">−8.1</span>
+            </div>
+            <div class="hit-row">
+              <span class="hit-id">CPD-0045</span>
+              <span class="hit-name">Indole-based cpd.</span>
+              <div class="affinity-wrap"><div class="affinity-bar" style="width:57px"></div></div>
+              <span class="hit-score">−7.4</span>
+            </div>
+            <div class="hit-row">
+              <span class="hit-id">CPD-5523</span>
+              <span class="hit-name">Thienopyrimidine</span>
+              <div class="affinity-wrap"><div class="affinity-bar" style="width:51px"></div></div>
+              <span class="hit-score">−6.9</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- INPUT -->
+    <div class="input-area">
+      <div class="quick-actions">
+        <div class="qa" onclick="quickSend('CPD-2847의 ADMET 특성을 분석해줘')">ADMET 분석</div>
+        <div class="qa" onclick="quickSend('EGFR 결합 포켓의 핵심 잔기를 분석해줘')">결합 포켓</div>
+        <div class="qa" onclick="quickSend('Lipinski Rule of 5 필터를 적용해줘')">Drug-like 필터</div>
+        <div class="qa" onclick="quickSend('KRAS G12C 타겟 스크리닝을 시작해줘')">KRAS 스크리닝</div>
+        <div class="qa" onclick="quickSend('CPD-2847 리드 화합물 최적화 전략을 제안해줘')">리드 최적화</div>
+        <div class="qa" onclick="quickSend('현재 히트 화합물들의 선택성 프로파일을 분석해줘')">선택성 분석</div>
+      </div>
+      <div class="input-row">
+        <textarea
+          class="chat-input"
+          id="chatInput"
+          placeholder="타겟 단백질, 화합물, 분석 방법에 대해 질문하세요..."
+          rows="1"
+          onkeydown="handleKey(event)"
+          oninput="autoResize(this)"
+        ></textarea>
+        <button class="send-btn" onclick="sendMessage()" title="전송">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="#07090f">
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ── RIGHT PANEL ── -->
+  <aside class="panel panel-right">
+    <div class="section-title">Molecule Viewer</div>
+    <div class="mol-viewer">
+      <canvas id="molCanvas" width="244" height="148"></canvas>
+      <div class="mol-overlay" id="molLabel">EGFR · Binding Site</div>
+    </div>
+
+    <div class="divider" style="margin: 10px 0 2px;"></div>
+    <div class="section-title">Properties · CPD-2847</div>
+    <div class="prop-bars">
+      <div class="prop-row">
+        <span class="prop-lbl">Selectivity</span>
+        <div class="prop-track"><div class="prop-fill pf-g" id="p1" style="width:0%"></div></div>
+        <span class="prop-val">91%</span>
+      </div>
+      <div class="prop-row">
+        <span class="prop-lbl">Solubility</span>
+        <div class="prop-track"><div class="prop-fill pf-b" id="p2" style="width:0%"></div></div>
+        <span class="prop-val">74%</span>
+      </div>
+      <div class="prop-row">
+        <span class="prop-lbl">Permeability</span>
+        <div class="prop-track"><div class="prop-fill pf-b" id="p3" style="width:0%"></div></div>
+        <span class="prop-val">68%</span>
+      </div>
+      <div class="prop-row">
+        <span class="prop-lbl">Metabolic Stb.</span>
+        <div class="prop-track"><div class="prop-fill pf-a" id="p4" style="width:0%"></div></div>
+        <span class="prop-val">82%</span>
+      </div>
+      <div class="prop-row">
+        <span class="prop-lbl">hERG Safety</span>
+        <div class="prop-track"><div class="prop-fill pf-g" id="p5" style="width:0%"></div></div>
+        <span class="prop-val">88%</span>
+      </div>
+      <div class="prop-row">
+        <span class="prop-lbl">BBB Perm.</span>
+        <div class="prop-track"><div class="prop-fill pf-a" id="p6" style="width:0%"></div></div>
+        <span class="prop-val">55%</span>
+      </div>
+      <div class="prop-row">
+        <span class="prop-lbl">Oral Bioav.</span>
+        <div class="prop-track"><div class="prop-fill pf-g" id="p7" style="width:0%"></div></div>
+        <span class="prop-val">79%</span>
+      </div>
+    </div>
+
+    <div class="divider" style="margin: 2px 0;"></div>
+    <div class="section-title">Key Binding Residues</div>
+    <div class="residue-tags">
+      <span class="res-tag hot">Lys745</span>
+      <span class="res-tag hot">Thr790</span>
+      <span class="res-tag">Met793</span>
+      <span class="res-tag hot">Cys797</span>
+      <span class="res-tag">Asp855</span>
+      <span class="res-tag">Phe856</span>
+      <span class="res-tag hot">Gly719</span>
+      <span class="res-tag">Ser720</span>
+      <span class="res-tag">Val726</span>
+      <span class="res-tag hot">ATP-site</span>
+      <span class="res-tag">Ile762</span>
+      <span class="res-tag hot">DFG-motif</span>
+    </div>
+
+    <div class="divider" style="margin: 2px 0;"></div>
+    <div class="section-title">Lipinski Compliance</div>
+    <div style="padding: 6px 12px 16px; display:flex; flex-direction:column; gap:5px;">
+      <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;">
+        <span style="color:var(--text-2)">MW</span>
+        <span style="color:var(--green)">393.4 g/mol ✓</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;">
+        <span style="color:var(--text-2)">LogP</span>
+        <span style="color:var(--green)">2.8 ✓</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;">
+        <span style="color:var(--text-2)">H-bond donors</span>
+        <span style="color:var(--green)">2 ✓</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;">
+        <span style="color:var(--text-2)">H-bond acceptors</span>
+        <span style="color:var(--green)">7 ✓</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;">
+        <span style="color:var(--text-2)">RotBonds</span>
+        <span style="color:var(--amber)">8 (borderline)</span>
+      </div>
+    </div>
+  </aside>
+
+</div><!-- /main -->
+
+<script>
+/* ═══════════════════════════════════════
+   CONFIG
+═══════════════════════════════════════ */
+const SYSTEM_PROMPT = `You are ProteinScreen AI, an expert drug discovery and protein screening AI agent for a public research platform.
+
+Your expertise covers:
+- Virtual screening of compound libraries against protein targets (EGFR, KRAS, ACE2, CDK4/6, BCL-2, etc.)
+- Molecular docking analysis and binding affinity prediction (Glide, AutoDock, Vina scores)
+- ADMET property evaluation (absorption, distribution, metabolism, excretion, toxicity)
+- Structure-Activity Relationship (SAR) analysis and lead optimization strategies
+- Drug-likeness assessment (Lipinski's Rule of Five, Veber rules, QED score)
+- Binding pocket analysis and key residue interactions
+- Selectivity profiling across kinome/proteome
+
+Always respond in Korean (한국어) with scientific precision.
+When discussing compounds, use proper chemical/pharmacological terminology.
+Provide specific, actionable insights. Include relevant numbers, thresholds, and recommendations.
+Format responses clearly with line breaks for readability.
+When asked about specific compounds, discuss binding mechanisms, key residues, interaction types (H-bond, hydrophobic, electrostatic), and optimization strategies.
+This platform is for public benefit and open science — support researchers with accurate, helpful guidance.`;
+
+let currentTarget = 'EGFR';
+let isProcessing = false;
+const conversationHistory = [];
+
+/* ═══════════════════════════════════════
+   LOADER
+═══════════════════════════════════════ */
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    animateBars();
+    drawMolecule('EGFR');
+    document.getElementById('loader').style.opacity = '0';
+    setTimeout(() => document.getElementById('loader').style.display = 'none', 400);
+  }, 1200);
+});
+
+/* ═══════════════════════════════════════
+   TARGET SELECTION
+═══════════════════════════════════════ */
+function selectTarget(el) {
+  document.querySelectorAll('.target-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+  currentTarget = el.dataset.target;
+  document.getElementById('currentTargetLabel').textContent = currentTarget;
+  document.getElementById('molLabel').textContent = currentTarget + ' · Binding Site';
+  drawMolecule(currentTarget);
+}
+
+/* ═══════════════════════════════════════
+   MOLECULE CANVAS (schematic network)
+═══════════════════════════════════════ */
+function drawMolecule(target) {
+  const canvas = document.getElementById('molCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Target-specific colors and node counts
+  const configs = {
+    'EGFR':    { color: '#00e5a0', nodes: 9, cx: 122, cy: 74 },
+    'KRAS G12C': { color: '#ffb740', nodes: 7, cx: 122, cy: 74 },
+    'ACE2':    { color: '#4da6ff', nodes: 8, cx: 122, cy: 74 },
+    'CDK4/6':  { color: '#ff6b6b', nodes: 10, cx: 122, cy: 74 },
+    'BCL-2':   { color: '#00e5a0', nodes: 8, cx: 122, cy: 74 },
+  };
+  const cfg = configs[target] || configs['EGFR'];
+  const c = cfg.color;
+
+  // Seed-based pseudo-random positions
+  const seed = target.length * 137;
+  function rng(i) { return ((seed * (i+1) * 2654435761) >>> 0) / 4294967296; }
+
+  const nodes = [];
+  const cx = cfg.cx, cy = cfg.cy;
+
+  // Central node
+  nodes.push({ x: cx, y: cy, r: 8, main: true });
+
+  // Ring 1 (close)
+  const r1n = Math.min(4, cfg.nodes - 1);
+  for (let i = 0; i < r1n; i++) {
+    const angle = (i / r1n) * Math.PI * 2 + rng(i) * 0.4;
+    nodes.push({ x: cx + Math.cos(angle) * 38, y: cy + Math.sin(angle) * 32, r: 5 });
+  }
+
+  // Ring 2 (far)
+  const r2n = cfg.nodes - r1n - 1;
+  for (let i = 0; i < r2n; i++) {
+    const angle = (i / r2n) * Math.PI * 2 + rng(i+10) * 0.6 + 0.3;
+    nodes.push({ x: cx + Math.cos(angle) * 68, y: cy + Math.sin(angle) * 56, r: 4 });
+  }
+
+  // Draw bonds
+  ctx.strokeStyle = c + '40';
+  ctx.lineWidth = 1;
+  nodes.forEach((n, i) => {
+    if (i === 0) return;
+    const parent = i <= r1n ? 0 : Math.floor(rng(i) * r1n) + 1;
+    ctx.beginPath();
+    ctx.moveTo(nodes[parent].x, nodes[parent].y);
+    ctx.lineTo(n.x, n.y);
+    ctx.stroke();
+  });
+
+  // Draw nodes
+  nodes.forEach((n, i) => {
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+    ctx.fillStyle = n.main ? c : c + '55';
+    ctx.fill();
+    if (n.main) {
+      ctx.strokeStyle = c;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.r + 4, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  });
+
+  // Glow center
+  const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, 60);
+  grd.addColorStop(0, c + '18');
+  grd.addColorStop(1, 'transparent');
+  ctx.fillStyle = grd;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 60, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/* ═══════════════════════════════════════
+   PROPERTY BARS
+═══════════════════════════════════════ */
+function animateBars() {
+  const vals = [91, 74, 68, 82, 88, 55, 79];
+  vals.forEach((v, i) => {
+    setTimeout(() => {
+      const el = document.getElementById('p' + (i+1));
+      if (el) el.style.width = v + '%';
+    }, i * 80);
+  });
+}
+
+/* ═══════════════════════════════════════
+   CHAT
+═══════════════════════════════════════ */
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function quickSend(text) {
+  document.getElementById('chatInput').value = text;
+  sendMessage();
+}
+
+function scrollToBottom() {
+  const m = document.getElementById('messages');
+  m.scrollTop = m.scrollHeight;
+}
+
+function addUserMessage(text) {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg msg-user';
+  div.innerHTML = `<div class="bubble">${escHtml(text)}</div>`;
+  msgs.appendChild(div);
+  scrollToBottom();
+}
+
+function addAgentMessage(html) {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg msg-agent';
+  div.innerHTML = `
+    <div class="agent-label"><div class="agent-dot"></div>ProteinScreen Agent</div>
+    <div class="bubble">${html}</div>
+  `;
+  msgs.appendChild(div);
+  scrollToBottom();
+  return div;
+}
+
+function showTyping() {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'msg msg-agent';
+  div.id = 'typingIndicator';
+  div.innerHTML = `
+    <div class="agent-label"><div class="agent-dot"></div>ProteinScreen Agent</div>
+    <div class="typing-bubble"><span></span><span></span><span></span></div>
+  `;
+  msgs.appendChild(div);
+  scrollToBottom();
+}
+
+function hideTyping() {
+  const el = document.getElementById('typingIndicator');
+  if (el) el.remove();
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .replace(/\n/g,'<br>');
+}
+
+function formatResponse(text) {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--green)">$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/`(.*?)`/g, '<code style="font-family:var(--mono);font-size:11px;color:var(--amber);background:var(--bg-raised);padding:1px 5px;border-radius:3px">$1</code>')
+    .replace(/\n/g, '<br>');
+}
+
+async function sendMessage() {
+  if (isProcessing) return;
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  isProcessing = true;
+
+  addUserMessage(text);
+  conversationHistory.push({ role: 'user', content: text });
+
+  showTyping();
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: SYSTEM_PROMPT + `\n\n현재 선택된 타겟 단백질: ${currentTarget}`,
+        messages: conversationHistory
+      })
+    });
+
+    const data = await res.json();
+    const reply = data.content?.map(b => b.text || '').join('') || '응답을 받지 못했습니다.';
+
+    conversationHistory.push({ role: 'assistant', content: reply });
+
+    hideTyping();
+    addAgentMessage(formatResponse(reply));
+
+    // Increment screened count
+    const sc = document.getElementById('statScreened');
+    sc.textContent = parseInt(sc.textContent) + Math.floor(Math.random() * 12 + 3);
+
+  } catch(err) {
+    hideTyping();
+    addAgentMessage(`<span style="color:var(--red)">오류: API 연결 실패. ${escHtml(err.message)}</span><br><br>
+      API 키가 설정되어 있는지 확인해주세요. <code style="font-family:var(--mono);font-size:11px;color:var(--amber)">config.js</code>에서 키를 설정할 수 있습니다.`);
+  }
+
+  isProcessing = false;
+}
+</script>
+</body>
+</html>
